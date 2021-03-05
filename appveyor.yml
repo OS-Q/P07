@@ -1,0 +1,20 @@
+build: off
+environment:
+
+  matrix:
+    - PLATFORMIO_PROJECT_DIR: "examples/arduino-blink"
+    - PLATFORMIO_PROJECT_DIR: "examples/arduino-ble-led"
+    - PLATFORMIO_PROJECT_DIR: "examples/arduino-serial-plotter"
+    - PLATFORMIO_PROJECT_DIR: "examples/arduino-bluefruit-bleuart"
+    - PLATFORMIO_PROJECT_DIR: "examples/mbed-rtos-blink-baremetal"
+    - PLATFORMIO_PROJECT_DIR: "examples/zephyr-blink"
+
+
+install:
+  - cmd: git submodule update --init --recursive
+  - cmd: SET PATH=C:\Python37\Scripts;%PATH%
+  - cmd: pip3 install -U https://github.com/OS-Q/S03/archive/master.zip
+  - cmd: platformio platform install file://.
+
+test_script:
+  - cmd: platformio run -s -d %PLATFORMIO_PROJECT_DIR%

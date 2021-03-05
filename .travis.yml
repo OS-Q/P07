@@ -1,0 +1,21 @@
+language: python
+python:
+  - "3.7"
+
+env:
+  - PLATFORMIO_PROJECT_DIR=examples/arduino-blink
+  - PLATFORMIO_PROJECT_DIR=examples/arduino-ble-led
+  - PLATFORMIO_PROJECT_DIR=examples/arduino-serial-plotter
+  - PLATFORMIO_PROJECT_DIR=examples/arduino-bluefruit-bleuart
+  - PLATFORMIO_PROJECT_DIR=examples/mbed-rtos-blink-baremetal
+  - PLATFORMIO_PROJECT_DIR=examples/zephyr-blink
+
+install:
+  - pip install -U https://github.com/OS-Q/S03/archive/master.zip
+  - platformio platform install file://.
+
+script:
+  - platformio run -s -d $PLATFORMIO_PROJECT_DIR
+
+notifications:
+  email: false
