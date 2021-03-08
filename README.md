@@ -4,7 +4,7 @@
 [![Build Status](https://github.com/OS-Q/P02/workflows/ubuntu/badge.svg)](https://github.com/OS-Q/ubuntu/actions)
 [![Build Status](https://github.com/OS-Q/P02/workflows/windows/badge.svg)](https://github.com/OS-Q/windows/actions)
 [![Build Status](https://travis-ci.com/OS-Q/P02.svg?branch=master)](https://travis-ci.com/OS-Q/P02)
-[![Build status](https://ci.appveyor.com/api/projects/status/nvc1gpqjxdp6bm0q?svg=true)](https://ci.appveyor.com/project/Qitas/P02)
+[![Build status](https://ci.appveyor.com/api/projects/status/31wttg8ash6rk89p?svg=true)](https://ci.appveyor.com/project/Qitas/p02)
 
 ### [简介](https://github.com/OS-Q/P02/wiki)
 
