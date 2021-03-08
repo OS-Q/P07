@@ -13,16 +13,8 @@
 
 #### 相关特性
 
-* BLE 5.0
-* NFC
+* Artix-7 XC7A FPGA
 
-#### 相关资源
-
-* [A02](https://github.com/OS-Q/A02)
-* [F02](https://github.com/OS-Q/F02)
-* [N02](https://github.com/OS-Q/N02)
-* [B02](https://github.com/OS-Q/B02)
-* [T02](https://github.com/OS-Q/T02)
 
 
 ### [Q = (OpenSource & OperatingSystem) ](http://www.OS-Q.com)
