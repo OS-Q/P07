@@ -49,7 +49,7 @@ jobs:
         name: code_check_report
         path: codecheck.txt
 
-  PIO:
+  build:
     strategy:
       fail-fast: false
       matrix:
