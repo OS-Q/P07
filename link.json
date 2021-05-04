@@ -16,23 +16,17 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/platformio/platform-openhw.git"
+    "url": "https://github.com/OS-Q/P07.git"
   },
   "version": "0.2.0",
   "frameworks": {
     "pulp-sdk": {
       "package": "framework-pulp-sdk",
-      "script": "builder/frameworks/pulp-sdk.py",
-      "description": "Software Development Kit for Parallel Ultra Low Power platform targeting high energy efficiencies",
-      "homepage": "https://github.com/pulp-platform/pulp-sdk",
-      "title": "PULP SDK"
+      "script": "extend/frameworks/pulp-sdk.py"
     },
     "pulp-runtime": {
       "package": "framework-pulp-runtime",
-      "script": "builder/frameworks/pulp-runtime.py",
-      "description": "Runtime Environment for Parallel Ultra Low Power platform targeting high energy efficiencies",
-      "homepage": "https://github.com/pulp-platform/pulp-runtime",
-      "title": "PULP Runtime Environment"
+      "script": "extend/frameworks/pulp-runtime.py"
     }
   },
   "packages": {

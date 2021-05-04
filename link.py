@@ -3,7 +3,6 @@ import platform
 
 from platformio.managers.platform import PlatformBase
 
-
 class P07Platform(PlatformBase):
 
     def get_boards(self, id_=None):
