@@ -1,24 +1,24 @@
-from os.path import join
+# Copyright 2014-present PlatformIO <contact@platformio.org>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import os
+import platform
 
 from platformio.managers.platform import PlatformBase
-from platformio.util import get_systype
 
 
-class P02Platform(PlatformBase):
-
-    def configure_default_packages(self, variables, targets):
-        if "zephyr" in variables.get("pioframework", []):
-            for p in self.packages:
-                if p.startswith("framework-zephyr-") or p in (
-                    "tool-cmake",
-                    "tool-dtc",
-                    "tool-ninja"
-                ):
-                    self.packages[p]["optional"] = False
-            if "windows" not in get_systype():
-                self.packages["tool-gperf"]["optional"] = False
-
-        return PlatformBase.configure_default_packages(self, variables, targets)
+class P07Platform(PlatformBase):
 
     def get_boards(self, id_=None):
         result = PlatformBase.get_boards(self, id_)
@@ -38,96 +38,95 @@ class P02Platform(PlatformBase):
 
         tools = (
             "digilent-hs1",
+            "digilent-hs2",
             "olimex-arm-usb-tiny-h",
             "olimex-arm-usb-ocd-h",
             "olimex-arm-usb-ocd",
             "olimex-jtag-tiny",
-            "verilator",
-            "whisper"
+            "ovpsim",
+            "renode"
         )
         for tool in tools:
             if tool in debug["tools"]:
                 continue
-            server_executable = "bin/openocd"
-            server_package = "tool-openocd-riscv-chipsalliance"
-            server_args = [
-                "-s",
-                join(
-                    self.get_package_dir("framework-wd-riscv-sdk") or "",
-                    "board",
-                    board.get("build.variant", ""),
-                ),
-                "-s",
-                "$PACKAGE_DIR/share/openocd/scripts",
-            ]
-            reset_cmds = [
-                "define pio_reset_halt_target",
-                "   load",
-                "   monitor reset halt",
-                "end",
-                "define pio_reset_run_target",
-                "   load",
-                "   monitor reset",
-                "end",
-            ]
-            if tool == "verilator":
-                openocd_config = join(
-                    self.get_dir(),
-                    "misc",
-                    "openocd",
-                    board.get("debug.openocd_board", "swervolf_sim.cfg"),
-                )
-                server_args.extend(["-f", openocd_config])
-            elif tool == "whisper":
-                server_executable = "whisper"
-                server_package = "tool-whisper"
-                server_args = [
-                    "--gdb",
-                    "--gdb-tcp-port=3333",
-                    "--configfile=$PACKAGE_DIR/whisper_eh1.json",
-                    "--alarm=100",
-                    "--consoleio=0x80002000",
-                    "--counters",
-                    "$PROG_PATH"
-                ]
-                reset_cmds = [
-                    "define pio_reset_halt_target",
-                    "end",
-                    "define pio_reset_run_target",
-                    "end",
-                ]
-            elif debug.get("openocd_config", ""):
-                server_args.extend(["-f", debug.get("openocd_config")])
+
+            if tool == "ovpsim":
+                debug["tools"][tool] = {
+                    "init_cmds": [
+                        "define pio_reset_halt_target",
+                        "end",
+                        "define pio_reset_run_target",
+                        "end",
+                        "set mem inaccessible-by-default off",
+                        "set arch riscv:rv32",
+                        "set remotetimeout 250",
+                        "target extended-remote $DEBUG_PORT",
+                        "$INIT_BREAK",
+                        "$LOAD_CMDS",
+                    ],
+                    "server": {
+                        "package": "tool-ovpsim-corev",
+                        "arguments": [
+                            "--variant", "CV32E40P",
+                            "--port", "3333",
+                            "--program",
+                            "$PROG_PATH"
+                        ],
+                        "executable": "riscvOVPsimCOREV"
+                    },
+                    "onboard": True
+                }
+
+            elif tool == "renode":
+                debug["tools"][tool] = {
+                    "server": {
+                        "package": "tool-renode",
+                        "arguments": [
+                            "--disable-xwt",
+                            "-e", "include @%s" % os.path.join(
+                                self.get_dir(), "misc", "renode", "openhw_cv32e40p.resc"),
+                            "-e", "machine StartGdbServer 3333 True"
+                        ],
+                        "ready_pattern": "GDB server with all CPUs started on port",
+                        "executable": ("bin/Renode.exe" if platform.system() == "Windows" else "renode")
+                    },
+                    "onboard": True
+                }
+
             else:
-                assert debug.get("openocd_target"), (
-                    "Missing target configuration for %s" % board.id
-                )
-                # All tools are FTDI based
-                server_args.extend(
-                    [
-                        "-f",
-                        "interface/ftdi/%s.cfg" % tool,
-                        "-f",
-                        "target/%s.cfg" % debug.get("openocd_target"),
-                    ]
-                )
-            debug["tools"][tool] = {
-                "init_cmds": reset_cmds + [
-                    "set mem inaccessible-by-default off",
-                    "set arch riscv:rv32",
-                    "set remotetimeout 250",
-                    "target extended-remote $DEBUG_PORT",
-                    "$INIT_BREAK",
-                    "$LOAD_CMDS",
-                ],
-                "server": {
-                    "package": server_package,
-                    "executable": server_executable,
-                    "arguments": server_args,
-                },
-                "onboard": tool in debug.get("onboard_tools", [])
-                or tool in ("verilator", "whisper"),
-            }
+                debug["tools"][tool] = {
+                    "init_cmds": [
+                        "define pio_reset_halt_target",
+                        "   load",
+                        "   monitor reset halt",
+                        "end",
+                        "define pio_reset_run_target",
+                        "   load",
+                        "   monitor reset",
+                        "end",
+                        "set mem inaccessible-by-default off",
+                        "set arch riscv:rv32",
+                        "set remotetimeout 250",
+                        "target extended-remote $DEBUG_PORT",
+                        "$INIT_BREAK",
+                        "$LOAD_CMDS",
+                    ],
+                    "server": {
+                        "package": "tool-openocd-riscv-pulp",
+                        "executable": "bin/openocd",
+                        "arguments": [
+                            "-s",
+                            os.path.join(self.get_dir(), "misc", "openocd"),
+                            "-s",
+                            "$PACKAGE_DIR/share/openocd/scripts",
+                            "-f",
+                            ("digilent-hs2.cfg" if tool == "digilent-hs2" else ("interface/ftdi/%s.cfg" % tool)),
+                            "-f",
+                            "cv32e40p_nexys.cfg",
+                        ]
+                    },
+                    "onboard": tool in debug.get("onboard_tools", []),
+                }
 
         board.manifest["debug"] = debug
         return board

@@ -1,65 +1,45 @@
-import os
+# Copyright 2014-present PIO Plus <contact@pioplus.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+#
+# Default flags for bare-metal programming (without any framework layers)
+#
 
 from SCons.Script import DefaultEnvironment
 
 env = DefaultEnvironment()
-platform = env.PioPlatform()
-board = env.BoardConfig()
+board_config = env.BoardConfig()
 
 env.Append(
     ASFLAGS=[
-        "-x", "assembler-with-cpp",
-        "-Wa,-march=%s" % board.get("build.march")
+        "-x", "assembler-with-cpp"
     ],
-
     CCFLAGS=[
         "-Os",
-        "-Wall",
-        "-ffunction-sections",
         "-fdata-sections",
-        "-march=%s" % board.get("build.march"),
-        "-mabi=%s" % board.get("build.mabi"),
-        "-mcmodel=%s" % board.get("build.mcmodel")
+        "-ffunction-sections",
+        "-march=%s" % board_config.get("build.march"),
     ],
-
+    CPPDEFINES=[
+        "__riscv__",
+        "__pulp__"
+    ],
     LINKFLAGS=[
-        "-Os",
-        "-march=%s" % board.get("build.march"),
-        "-mabi=%s" % board.get("build.mabi"),
-        "-mcmodel=%s" % board.get("build.mcmodel"),
-        "-Wl,-gc-sections",
-        "-nostdlib",
-        "-nostartfiles",
-        "-static",
-        "-Wl,--wrap=malloc",
-        "-Wl,--wrap=free",
-        "-Wl,--wrap=open",
-        "-Wl,--wrap=lseek",
-        "-Wl,--wrap=read",
-        "-Wl,--wrap=write",
-        "-Wl,--wrap=fstat",
-        "-Wl,--wrap=stat",
-        "-Wl,--wrap=close",
-        "-Wl,--wrap=link",
-        "-Wl,--wrap=unlink",
-        "-Wl,--wrap=execve",
-        "-Wl,--wrap=fork",
-        "-Wl,--wrap=getpid",
-        "-Wl,--wrap=kill",
-        "-Wl,--wrap=wait",
-        "-Wl,--wrap=isatty",
-        "-Wl,--wrap=times",
-        "-Wl,--wrap=sbrk",
-        "-Wl,--wrap=_exit",
-        '-Wl,-Map="%s"' % os.path.join(
-            "$BUILD_DIR", os.path.basename(env.subst("${PROJECT_DIR}.map"))),
-        "-Wl,--defsym=__comrv_cache_size=0",
-    ]
+        "-march=%s" % board_config.get("build.march"),
+        "-nostartfiles"
+    ],
+    LIBS=["gcc"],
 )
 
-# copy CCFLAGS to ASFLAGS (-x assembler-with-cpp mode)
 env.Append(ASFLAGS=env.get("CCFLAGS", [])[:])
-
-#
-# Target: Build libraries
-#

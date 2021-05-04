@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
-import subprocess
 import sys
 import os
 
@@ -24,32 +22,7 @@ from SCons.Script import (
     Builder,
     Default,
     DefaultEnvironment,
-    WhereIs,
 )
-
-
-def generate_vh(target, source, env):
-    binary_file = source[0].get_path()
-    assert binary_file.endswith(".bin")
-    vh_file = binary_file.replace(".bin", ".vh")
-    result = ""
-    with open(binary_file, "rb") as fp:
-        cnt = 7
-        s = ["00"] * 8
-        while True:
-            data = fp.read(1)
-            if not data:
-                result = result + "".join(s) + "\n"
-                break
-            s[cnt] = "{:02X}".format(data[0])
-            if cnt == 0:
-                result = result + "".join(s) + "\n"
-                s = ["00"] * 8
-                cnt = 8
-            cnt -= 1
-
-    with open(vh_file, "wb") as fp:
-        fp.write(bytes(result, "ascii"))
 
 
 def generate_disassembly(target, source, env):
@@ -68,41 +41,19 @@ def generate_disassembly(target, source, env):
     )
 
 
-def run_verilator(target, source, env):
-    trace_file = os.path.join(env.subst("$BUILD_DIR"), "trace.vcd")
-    if os.path.isfile(trace_file):
-        os.remove(trace_file)
-
-    cmd = [
-        os.path.join(
-            platform.get_package_dir("tool-verilator-swervolf") or "",
-            env.BoardConfig().get("debug.verilator.binary", "Vswervolf_core_tb")
-        ),
-        "+ram_init_file=" + os.path.basename(source[0].get_path()),
-        "+vcd=1",
-    ]
-
-    p = subprocess.Popen(cmd, cwd=env.subst("$BUILD_DIR"))
-
-    # Wait for some time while data is being collected
-    time.sleep(3)
-    p.terminate()
-
-
 env = DefaultEnvironment()
-env.SConscript("compat.py", exports="env")
 platform = env.PioPlatform()
 board_config = env.BoardConfig()
 
 env.Replace(
-    AR="riscv64-unknown-elf-gcc-ar",
-    AS="riscv64-unknown-elf-as",
-    CC="riscv64-unknown-elf-gcc",
-    GDB="riscv64-unknown-elf-gdb",
-    CXX="riscv64-unknown-elf-g++",
-    OBJCOPY="riscv64-unknown-elf-objcopy",
-    RANLIB="riscv64-unknown-elf-gcc-ranlib",
-    SIZETOOL="riscv64-unknown-elf-size",
+    AR="riscv32-unknown-elf-gcc-ar",
+    AS="riscv32-unknown-elf-as",
+    CC="riscv32-unknown-elf-gcc",
+    GDB="riscv32-unknown-elf-gdb",
+    CXX="riscv32-unknown-elf-g++",
+    OBJCOPY="riscv32-unknown-elf-objcopy",
+    RANLIB="riscv32-unknown-elf-gcc-ranlib",
+    SIZETOOL="riscv32-unknown-elf-size",
     ARFLAGS=["rc"],
     SIZEPRINTCMD="$SIZETOOL -d $SOURCES",
     PROGSUFFIX=".elf",
@@ -128,9 +79,6 @@ env.Append(
             ),
             suffix=".bin",
         ),
-        BinToVh=Builder(
-            action=env.VerboseAction(generate_vh, "Building $TARGET"), suffix=".vh"
-        ),
     )
 )
 
@@ -144,22 +92,13 @@ if not pioframework:
 #
 
 
-if "zephyr" in pioframework:
-    env.SConscript(
-        os.path.join(platform.get_package_dir(
-            "framework-zephyr"), "scripts", "platformio", "platformio-build-pre.py"),
-        exports={"env": env}
-    )
-
 target_elf = None
 if "nobuild" in COMMAND_LINE_TARGETS:
     target_elf = os.path.join("$BUILD_DIR", "${PROGNAME}.elf")
     target_bin = os.path.join("$BUILD_DIR", "${PROGNAME}.bin")
-    target_vh = os.path.join("$BUILD_DIR", "${PROGNAME}.vh")
 else:
     target_elf = env.BuildProgram()
     target_bin = env.ElfToBin(os.path.join("$BUILD_DIR", "${PROGNAME}"), target_elf)
-    target_vh = env.BinToVh(os.path.join("$BUILD_DIR", "${PROGNAME}"), target_bin)
 
 AlwaysBuild(env.Alias("nobuild", target_bin))
 target_buildprog = env.Alias("buildprog", target_bin, target_bin)
@@ -184,40 +123,42 @@ target_size = env.AddPlatformTarget(
 # Target: Program FPGA
 #
 
-# Note: there is a precompiled bitstream in framework-wd-riscv-sdk package
 bitstream_file = os.path.abspath(
-    board_config.get("build.bitstream_file", "swervolf_0.bit"))
+    board_config.get("build.bitstream_file", "bistream.bit")
+)
 
 if not os.path.isfile(bitstream_file):
-    bitstream_file = os.path.join(platform.get_dir(), "misc", "bitstream", "rvfpga.bit")
+    bitstream_file = os.path.join(
+        platform.get_dir(), "misc", "bitstream", "cv32e40p_nexys.bit"
+    )
 
-if "program_fpga" in COMMAND_LINE_TARGETS and not os.path.isfile(bitstream_file):
+if "upload_bistream" in COMMAND_LINE_TARGETS and not os.path.isfile(bitstream_file):
     sys.stderr.write("Error: Couldn't find bitstream file.\n")
     env.Exit(1)
 
 env.AddPlatformTarget(
-    "program_fpga",
+    "upload_bitstream",
     bitstream_file,
     env.VerboseAction(
         " ".join(
             [
                 '"%s"'
                 % os.path.join(
-                    platform.get_package_dir("tool-openocd-riscv-chipsalliance") or "",
+                    platform.get_package_dir("tool-openocd-riscv-pulp") or "",
                     "bin",
                     "openocd",
                 ),
                 "-s",
                 '"%s"'
                 % os.path.join(
-                    platform.get_package_dir("framework-wd-riscv-sdk") or "",
-                    "board",
-                    board_config.get("build.variant", ""),
+                    platform.get_dir(),
+                    "misc",
+                    "openocd",
                 ),
                 "-s",
                 '"%s"'
                 % os.path.join(
-                    platform.get_package_dir("tool-openocd-riscv-chipsalliance") or "",
+                    platform.get_package_dir("tool-openocd-riscv-pulp") or "",
                     "share",
                     "openocd",
                     "scripts",
@@ -225,87 +166,12 @@ env.AddPlatformTarget(
                 "-c",
                 '"set BITFILE {$SOURCE}"',
                 "-f",
-                "%s_program.cfg" % env.subst("$BOARD")
+                "program_bitstream.cfg",
             ]
         ),
         "Programming bitstream $SOURCE",
     ),
     "Upload Bitstream",
-)
-
-#
-# Target: Generate trace for GTKWave using Verilator
-#
-
-env.AddPlatformTarget("generate_trace", target_vh, env.VerboseAction(
-    run_verilator, "Generating trace from Verilator"), "Generate Trace")
-
-
-#
-# Target: Run Verilator simulator to connect OpenOCD
-#
-
-env.AddPlatformTarget(
-    "start_verilator",
-    None,
-    env.VerboseAction(
-        " ".join(
-            [
-                '"%s"'
-                % os.path.join(
-                    platform.get_package_dir("tool-verilator-swervolf") or "",
-                    board_config.get("debug.verilator.binary", "Vswervolf_core_tb"),
-                ),
-                "+jtag_vpi_enable=1",
-            ]
-        ),
-        "Running Verilator",
-    ),
-    "Start Verilator",
-)
-
-
-#
-# Target: Generate bitstream
-#
-
-vivado_path = ""
-vivado_tcl_script = ""
-vivado_design_project = ""
-if "generate_bitstream" in COMMAND_LINE_TARGETS:
-    vivado_path = WhereIs("vivado")
-    if not vivado_path:
-        sys.stderr.write("Error: Couldn't find Vivado tools!\n")
-        env.Exit(1)
-
-    vivado_tcl_script = os.path.abspath(
-        board_config.get("build.swervolf_run_tc", "swervolf_0.6_run.tcl")
-    )
-
-    vivado_design_project = os.path.abspath(
-        board_config.get("build.swervolf_xpr", "swervolf_0.6.xpr")
-    )
-
-    for f in (vivado_tcl_script, vivado_design_project):
-        if not os.path.isfile(f):
-            sys.stderr.write("Error: Couldn't find  file %s\n" % f)
-            env.Exit(1)
-
-env.AddPlatformTarget(
-    "generate_bitstream", None, env.VerboseAction(
-        " ".join(
-            [
-                vivado_path,
-                "-notrace",
-                "-mode",
-                "batch",
-                "-source",
-                vivado_tcl_script,
-                vivado_design_project,
-            ]
-        ),
-        "Generating bitstream from $SOURCES",
-    ), "Generate Bitstream"
 )
 
 #
@@ -318,26 +184,40 @@ upload_actions = []
 upload_target = target_elf
 
 if upload_protocol in debug_tools:
-    openocd_args = [
-        "-c",
-        "debug_level %d" % (2 if int(ARGUMENTS.get("PIOVERBOSE", 0)) else 1),
-        "-s",
-        platform.get_package_dir("tool-openocd-riscv-chipsalliance") or "",
-    ]
-    openocd_args.extend(
-        debug_tools.get(upload_protocol).get("server").get("arguments", [])
-    )
-    openocd_args.extend(
-        [
-            "-c", "load_image {$SOURCE} %s" % board_config.get(
-                "upload").get("image_offset", ""),
-            "-c", "reset run",
-            "-c", "shutdown"
+    if upload_protocol == "renode":
+        uploader = "renode"
+        uploader_flags = [arg for arg in debug_tools.get(upload_protocol).get(
+            "server").get("arguments", []) if arg != "--disable-xwt"]
+        uploader_flags.extend([
+            "-e", "sysbus LoadELF @$SOURCE",
+            "-e", "start"
+        ])
+    else:
+        uploader = "openocd"
+        uploader_flags = [
+            "-c",
+            "debug_level %d" % (2 if int(ARGUMENTS.get("PIOVERBOSE", 0)) else 1),
+            "-s",
+            platform.get_package_dir("tool-openocd-riscv-pulp") or "",
         ]
-    )
+        uploader_flags.extend(
+            debug_tools.get(upload_protocol).get("server").get("arguments", [])
+        )
+        uploader_flags.extend(
+            [
+                "-c",
+                "load_image {$SOURCE} %s"
+                % board_config.get("upload").get("image_offset", ""),
+                "-c",
+                "reset run",
+                "-c",
+                "shutdown",
+            ]
+        )
+
     env.Replace(
-        UPLOADER="openocd",
-        UPLOADERFLAGS=openocd_args,
+        UPLOADER=uploader,
+        UPLOADERFLAGS=uploader_flags,
         UPLOADCMD="$UPLOADER $UPLOADERFLAGS",
     )
     upload_actions = [env.VerboseAction("$UPLOADCMD", "Uploading $SOURCE")]
